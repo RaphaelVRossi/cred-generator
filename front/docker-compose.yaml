@@ -1,0 +1,12 @@
+version: '3.8' # Versão do Docker Compose
+
+services:
+  frontend:
+    build:
+      context: . # O contexto de build é o diretório atual onde o Dockerfile está
+      dockerfile: Dockerfile # Especifica o nome do Dockerfile
+    ports:
+      - "80:80" # Mapeia a porta 80 do host para a porta 80 do container
+
+    restart: unless-stopped # Garante que o container reinicie automaticamente, a menos que seja parado manualmente
+

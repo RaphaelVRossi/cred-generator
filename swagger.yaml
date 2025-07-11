@@ -1,0 +1,409 @@
+openapi: 3.0.0
+info:
+  title: API de Gerenciamento de Eventos e Participantes
+  description: Uma API RESTful para gerenciar eventos e seus participantes, com persistência em MongoDB.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Servidor de Desenvolvimento Local
+
+tags:
+  - name: Eventos
+    description: Operações relacionadas a eventos
+  - name: Participantes
+    description: Operações relacionadas a participantes
+
+paths:
+  /events:
+    get:
+      summary: Lista todos os eventos
+      tags:
+        - Eventos
+      responses:
+        '200':
+          description: Lista de eventos retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Evento'
+        '500':
+          description: Erro interno do servidor
+    post:
+      summary: Cria um novo evento
+      tags:
+        - Eventos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventoInput'
+      responses:
+        '201':
+          description: Evento criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evento'
+        '400':
+          description: Requisição inválida
+        '500':
+          description: Erro interno do servidor
+
+  /events/{id}:
+    get:
+      summary: Obtém um evento por ID
+      tags:
+        - Eventos
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid # Embora seja ObjectID, string é o tipo JSON
+          required: true
+          description: ID do evento
+      responses:
+        '200':
+          description: Evento encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evento'
+        '400':
+          description: ID de evento inválido
+        '404':
+          description: Evento não encontrado
+        '500':
+          description: Erro interno do servidor
+    put:
+      summary: Atualiza um evento existente
+      tags:
+        - Eventos
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID do evento a ser atualizado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventoInput'
+      responses:
+        '200':
+          description: Evento atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evento'
+        '400':
+          description: Requisição inválida ou ID de evento inválido
+        '404':
+          description: Evento não encontrado
+        '500':
+          description: Erro interno do servidor
+    delete:
+      summary: Deleta um evento
+      tags:
+        - Eventos
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID do evento a ser deletado
+      responses:
+        '204':
+          description: Evento deletado com sucesso (sem conteúdo)
+        '400':
+          description: ID de evento inválido
+        '404':
+          description: Evento não encontrado
+        '500':
+          description: Erro interno do servidor
+
+  /participants:
+    post:
+      summary: Cadastra um novo participante e o vincula ao último evento criado
+      tags:
+        - Participantes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipanteInput'
+      responses:
+        '201':
+          description: Participante criado e vinculado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participante'
+        '200':
+          description: Participante existente atualizado com novo evento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participante'
+        '400':
+          description: Requisição inválida
+        '404':
+          description: Nenhum evento encontrado para vincular o participante
+        '500':
+          description: Erro interno do servidor
+
+  /events/{eventId}/participants:
+    get:
+      summary: Lista todos os participantes de um evento específico
+      tags:
+        - Participantes
+      parameters:
+        - in: path
+          name: eventId
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID do evento
+      responses:
+        '200':
+          description: Lista de participantes retornada com sucesso
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Participante'
+        '400':
+          description: ID de evento inválido
+        '500':
+          description: Erro interno do servidor
+
+  /participants/{id}:
+    get:
+      summary: Obtém um participante por ID
+      tags:
+        - Participantes
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID do participante
+      responses:
+        '200':
+          description: Participante encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participante'
+        '400':
+          description: ID de participante inválido
+        '404':
+          description: Participante não encontrado
+        '500':
+          description: Erro interno do servidor
+    put:
+      summary: Atualiza os dados de um participante existente
+      tags:
+        - Participantes
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID do participante a ser atualizado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParticipanteInput'
+      responses:
+        '200':
+          description: Participante atualizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participante'
+        '400':
+          description: Requisição inválida ou ID de participante inválido
+        '404':
+          description: Participante não encontrado
+        '500':
+          description: Erro interno do servidor
+    delete:
+      summary: Deleta um participante
+      tags:
+        - Participantes
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+          required: true
+          description: ID do participante a ser deletado
+      responses:
+        '204':
+          description: Participante deletado com sucesso (sem conteúdo)
+        '400':
+          description: ID de participante inválido
+        '404':
+          description: Participante não encontrado
+        '500':
+          description: Erro interno do servidor
+
+components:
+  schemas:
+    Evento:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid # Representa o primitive.ObjectID do MongoDB
+          description: ID único do evento
+          readOnly: true
+        nome:
+          type: string
+          description: Nome do evento
+          example: "Conferência de Tecnologia"
+        descricao:
+          type: string
+          description: Descrição detalhada do evento
+          example: "Uma conferência sobre as últimas tendências em tecnologia."
+        data:
+          type: string
+          format: date-time
+          description: Data e hora do evento (formato ISO 8601)
+          example: "2025-10-26T09:00:00Z"
+        endereco:
+          type: string
+          description: Endereço físico ou virtual do evento
+          example: "Centro de Convenções XYZ"
+        background_color:
+          type: string
+          description: Cor de fundo da credencial do evento (formato hexadecimal ou nome da cor)
+          example: "#FF0000"
+        text_color:
+          type: string
+          description: Cor do texto da credencial do evento (formato hexadecimal ou nome da cor)
+          example: "#FFFFFF"
+      required:
+        - nome
+        - descricao
+        - data
+        - endereco
+        - background_color
+        - text_color
+    EventoInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          description: Nome do evento
+          example: "Conferência de Tecnologia"
+        descricao:
+          type: string
+          description: Descrição detalhada do evento
+          example: "Uma conferência sobre as últimas tendências em tecnologia."
+        data:
+          type: string
+          format: date-time
+          description: Data e hora do evento (formato ISO 8601)
+          example: "2025-10-26T09:00:00Z"
+        endereco:
+          type: string
+          description: Endereço físico ou virtual do evento
+          example: "Centro de Convenções XYZ"
+        background_color:
+          type: string
+          description: Cor de fundo da credencial do evento (formato hexadecimal ou nome da cor)
+          example: "#FF0000"
+        text_color:
+          type: string
+          description: Cor do texto da credencial do evento (formato hexadecimal ou nome da cor)
+          example: "#FFFFFF"
+      required:
+        - nome
+        - descricao
+        - data
+        - endereco
+        - background_color
+        - text_color
+
+    Participante:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid # Representa o primitive.ObjectID do MongoDB
+          description: ID único do participante
+          readOnly: true
+        nome:
+          type: string
+          description: Nome do participante
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          description: Endereço de e-mail do participante (único)
+          example: "joao.silva@example.com"
+        empresa:
+          type: string
+          description: Empresa onde o participante trabalha
+          example: "Tech Solutions Ltda."
+        profile_picture_base64:
+          type: string
+          format: byte # Indica que é uma string de dados codificados em base64
+          description: Foto de perfil do participante em formato Base64
+          example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg=="
+        eventos_participados:
+          type: array
+          items:
+            type: string
+            format: uuid # IDs dos eventos que o participante já participou
+          description: Lista de IDs dos eventos que o participante participou
+          readOnly: true # Esta lista é gerenciada pela API, não diretamente pelo cliente
+      required:
+        - nome
+        - email
+    ParticipanteInput:
+      type: object
+      properties:
+        nome:
+          type: string
+          description: Nome do participante
+          example: "João Silva"
+        email:
+          type: string
+          format: email
+          description: Endereço de e-mail do participante (único)
+          example: "joao.silva@example.com"
+        empresa:
+          type: string
+          description: Empresa onde o participante trabalha (opcional na criação/atualização)
+          example: "Tech Solutions Ltda."
+        profile_picture_base64:
+          type: string
+          format: byte # Indica que é uma string de dados codificados em base64
+          description: Foto de perfil do participante em formato Base64 (opcional na criação/atualização)
+          example: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAHElEQVQI12P4//8/w38GIAXDIBKE0DHxgljNBAAO9TXL0Y4OHwAAAABJRU5ErkJggg=="
+      required:
+        - nome
+        - email
+

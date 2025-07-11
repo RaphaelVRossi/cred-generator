@@ -1,0 +1,30 @@
+version: '3.8' # Versão da sintaxe do Docker Compose
+
+services:
+  # Serviço para a aplicação Go (sua API)
+  app:
+    build: . # Instrução para construir a imagem Docker a partir do Dockerfile no diretório atual
+    ports:
+      - "8080:8080" # Mapeia a porta 8080 do host para a porta 8080 do contêiner
+    depends_on: # Define uma dependência: 'app' só iniciará depois que 'mongo' estiver pronto
+      - mongo
+    environment: # Variáveis de ambiente para a aplicação (se necessário, como a URI do MongoDB)
+      # A URI do MongoDB agora aponta para o nome do serviço 'mongo' dentro da rede Docker Compose
+      MONGO_URI: "mongodb://mongo:27017"
+    # volumes:
+    #   - ./logs:/app/logs # Exemplo de volume para persistir logs da aplicação, descomente se precisar
+
+  # Serviço para o banco de dados MongoDB
+  mongo:
+    image: mongo:latest # Usa a imagem oficial mais recente do MongoDB
+    ports:
+      - "27017:27017" # Mapeia a porta 27017 do host para a porta 27017 do contêiner
+    volumes:
+      - mongo_data:/data/db # Persiste os dados do MongoDB em um volume nomeado para evitar perda de dados
+    environment: # Variáveis de ambiente para o MongoDB (opcional, para usuário/senha)
+      MONGO_INITDB_DATABASE: eventodb # Define o nome do banco de dados inicial
+
+# Volumes nomeados para persistência de dados
+volumes:
+  mongo_data: # Volume para os dados do MongoDB
+
