@@ -149,15 +149,15 @@ const App = () => {
         }
     };
 
-    // Função para gerar e baixar a credencial em PDF
-    const downloadCredential = async () => {
+    // Função para gerar e compartilhar a credencial nas redes sociais
+    const shareCredential = async () => {
         if (!credentialRef.current) {
-            setError("Erro: Elemento da credencial não encontrado para download.");
+            setError("Erro: Elemento da credencial não encontrado para compartilhamento.");
             return;
         }
-        // Verifica se as bibliotecas estão disponíveis globalmente
-        if (!window.html2canvas || !window.jspdf) {
-            setError("Erro: Bibliotecas de PDF (html2canvas, jspdf) não carregadas. Por favor, inclua-as via CDN.");
+        // Verifica se a biblioteca html2canvas está disponível globalmente
+        if (!window.html2canvas) {
+            setError("Erro: Biblioteca html2canvas não carregada. Por favor, inclua-a via CDN.");
             return;
         }
 
@@ -165,37 +165,52 @@ const App = () => {
         try {
             // Renderiza o elemento HTML da credencial em um canvas
             const canvas = await window.html2canvas(credentialRef.current, {
-                scale: 2, // Aumenta a resolução para melhor qualidade no PDF
+                scale: 2, // Aumenta a resolução para melhor qualidade
                 useCORS: true, // Importante se houver imagens de outras origens
             });
 
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4'); // 'p' para retrato, 'mm' para milímetros, 'a4' para tamanho da página
-
-            const imgWidth = 190; // Largura da imagem no PDF (ajuste conforme necessário)
-            const pageHeight = pdf.internal.pageSize.height;
-            const imgHeight = canvas.height * imgWidth / canvas.width;
-            let heightLeft = imgHeight;
-
-            let position = 10; // Posição inicial Y no PDF
-
-            // Adiciona a imagem ao PDF, dividindo em várias páginas se necessário
-            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-            }
-
-            pdf.save(`credencial_${participant.nome.replace(/\s/g, '_')}.pdf`);
-            setSuccessMessage('Credencial baixada com sucesso!');
+            // Converte o canvas para uma imagem PNG em formato blob
+            canvas.toBlob(async (blob) => {
+                try {
+                    // Cria um arquivo a partir do blob
+                    const file = new File([blob], `credencial_${participant.nome.replace(/\s/g, '_')}.png`, { type: 'image/png' });
+                    
+                    // Verifica se a API Web Share está disponível
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: 'Minha Credencial Golang Sampa',
+                            text: `Credencial de ${participant.nome} para o evento ${latestEvent?.nome || 'Golang Sampa'}`,
+                            files: [file]
+                        });
+                        setSuccessMessage('Credencial compartilhada com sucesso!');
+                    } else {
+                        // Fallback para navegadores que não suportam a API Web Share
+                        // Cria um URL temporário para a imagem
+                        const imageUrl = URL.createObjectURL(blob);
+                        
+                        // Cria um link para download
+                        const link = document.createElement('a');
+                        link.href = imageUrl;
+                        link.download = `credencial_${participant.nome.replace(/\s/g, '_')}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        // Libera o URL temporário
+                        URL.revokeObjectURL(imageUrl);
+                        
+                        setSuccessMessage('Imagem da credencial salva! Agora você pode compartilhá-la nas redes sociais.');
+                    }
+                } catch (err) {
+                    console.error("Erro ao compartilhar credencial:", err);
+                    setError(`Erro ao compartilhar a credencial: ${err.message}. Tente salvar a imagem e compartilhar manualmente.`);
+                } finally {
+                    setLoading(false);
+                }
+            }, 'image/png');
         } catch (err) {
-            console.error("Erro ao baixar credencial:", err);
-            setError(`Erro ao baixar a credencial: ${err.message}.`);
-        } finally {
+            console.error("Erro ao gerar imagem da credencial:", err);
+            setError(`Erro ao gerar imagem da credencial: ${err.message}.`);
             setLoading(false);
         }
     };
@@ -245,7 +260,7 @@ const App = () => {
     return (
         
         <div
-            className="min-h-screen font-inter flex flex-col items-center justify-center p-4"
+            className="min-h-screen font-inter flex flex-col items-center justify-center p-3 sm:p-4 md:p-6"
             style={{
                 backgroundColor: eventBgColor,
                 color: eventTextColor
@@ -253,29 +268,34 @@ const App = () => {
         >
             {/* O bloco de exibição do User ID foi removido daqui */}
 
-            <div className="bg-gray-800 bg-opacity-90 rounded-xl shadow-2xl p-8 max-w-lg w-full transform transition-all duration-300 hover:scale-105">
-                <h1 className="text-4xl font-extrabold text-center mb-6" style={{ color: "#eceff1" }}>
+            <div className="bg-gray-800 bg-opacity-90 rounded-xl shadow-2xl p-3 sm:p-6 md:p-8 max-w-xs sm:max-w-sm md:max-w-lg w-full transform transition-all duration-300 hover:scale-105 mx-auto">
+                <h1 className="text-xl sm:text-3xl md:text-4xl font-extrabold text-center mb-3 sm:mb-6" style={{ color: "#eceff1" }}>
                     Checkin GolangSP
                 </h1>
 
                 {error && (
-                    <div className="bg-red-600 bg-opacity-80 text-white p-4 rounded-lg mb-4 flex items-center justify-between shadow-md">
+                    <div className="bg-red-600 bg-opacity-80 text-white p-2 sm:p-4 rounded-lg mb-3 sm:mb-4 flex items-center justify-between shadow-md text-xs sm:text-base">
                         <span>{error}</span>
-                        <button onClick={() => setError('')} className="text-white font-bold text-xl ml-4">&times;</button>
+                        <button onClick={() => setError('')} className="text-white font-bold text-lg sm:text-xl ml-2 sm:ml-4">&times;</button>
                     </div>
                 )}
 
                 {successMessage && (
-                    <div className="bg-green-600 bg-opacity-80 text-white p-4 rounded-lg mb-4 flex items-center justify-between shadow-md">
+                    <div className="bg-green-600 bg-opacity-80 text-white p-2 sm:p-4 rounded-lg mb-3 sm:mb-4 flex items-center justify-between shadow-md text-xs sm:text-base">
                         <span>{successMessage}</span>
-                        <button onClick={() => setSuccessMessage('')} className="text-white font-bold text-xl ml-4">&times;</button>
+                        <button onClick={() => setSuccessMessage('')} className="text-white font-bold text-lg sm:text-xl ml-2 sm:ml-4">&times;</button>
                     </div>
                 )}
 
-                {!participant ? (
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                {!latestEvent ? (
+                    <div className="text-center py-4 sm:py-8">
+                        <p className="text-base sm:text-xl text-yellow-400 mb-2 sm:mb-4">Nenhum evento disponível no momento</p>
+                        <p className="text-sm sm:text-base text-gray-400">Por favor, tente novamente mais tarde.</p>
+                    </div>
+                ) : !participant ? (
+                    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                         <div>
-                            <label htmlFor="nome" className="block text-lg font-medium text-gray-300 mb-2">
+                            <label htmlFor="nome" className="block text-base sm:text-lg font-medium text-gray-300 mb-1 sm:mb-2">
                                 Nome Completo
                             </label>
                             <input
@@ -283,14 +303,14 @@ const App = () => {
                                 id="nome"
                                 value={nome}
                                 onChange={(e) => setNome(e.target.value)}
-                                className="w-full px-5 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200"
+                                className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200"
                                 style={{ borderColor: adjustColor(eventTextColor, -30), focusRingColor: buttonRingColor }} // Borda e foco dinâmicos
                                 placeholder="Seu nome"
                                 required
                             />
                         </div>
                         <div>
-                            <label htmlFor="email" className="block text-lg font-medium text-gray-300 mb-2">
+                            <label htmlFor="email" className="block text-base sm:text-lg font-medium text-gray-300 mb-1 sm:mb-2">
                                 E-mail
                             </label>
                             <input
@@ -298,14 +318,14 @@ const App = () => {
                                 id="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-5 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200"
+                                className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200"
                                 style={{ borderColor: adjustColor(eventTextColor, -30), focusRingColor: buttonRingColor }} // Borda e foco dinâmicos
                                 placeholder="seu.email@exemplo.com"
                                 required
                             />
                         </div>
                         <div>
-                            <label htmlFor="empresa" className="block text-lg font-medium text-gray-300 mb-2">
+                            <label htmlFor="empresa" className="block text-base sm:text-lg font-medium text-gray-300 mb-1 sm:mb-2">
                                 Empresa (Opcional)
                             </label>
                             <input
@@ -313,13 +333,13 @@ const App = () => {
                                 id="empresa"
                                 value={empresa}
                                 onChange={(e) => setEmpresa(e.target.value)}
-                                className="w-full px-5 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200"
+                                className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200"
                                 style={{ borderColor: adjustColor(eventTextColor, -30), focusRingColor: buttonRingColor }} // Borda e foco dinâmicos
                                 placeholder="Nome da sua empresa"
                             />
                         </div>
                         <div>
-                            <label htmlFor="profilePicture" className="block text-lg font-medium text-gray-300 mb-2">
+                            <label htmlFor="profilePicture" className="block text-base sm:text-lg font-medium text-gray-300 mb-1 sm:mb-2">
                                 Foto de Perfil (Opcional)
                             </label>
                             <input
@@ -327,28 +347,28 @@ const App = () => {
                                 id="profilePicture"
                                 accept="image/*"
                                 onChange={handleFileChange}
-                                className="w-full px-5 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-white hover:file:bg-gray-500"
+                                className="w-full px-3 sm:px-5 py-2 sm:py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 transition-all duration-200 file:mr-2 sm:file:mr-4 file:py-1 sm:file:py-2 file:px-2 sm:file:px-4 file:rounded-full file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-gray-600 file:text-white hover:file:bg-gray-500"
                             />
                             {/* Pré-visualização da imagem ou ícone de perfil */}
-                            <div className="mt-4 text-center">
-                                <p className="text-gray-400 text-sm mb-2">Pré-visualização da Imagem:</p>
+                            <div className="mt-3 sm:mt-4 text-center">
+                                <p className="text-gray-400 text-xs sm:text-sm mb-1 sm:mb-2">Pré-visualização da Imagem:</p>
                                 {profilePictureBase64 ? (
-                                    <img src={profilePictureBase64} alt="Pré-visualização da Foto de Perfil" className="max-w-xs max-h-48 mx-auto rounded-lg shadow-md object-cover" />
+                                    <img src={profilePictureBase64} alt="Pré-visualização da Foto de Perfil" className="max-w-full sm:max-w-xs max-h-32 sm:max-h-48 mx-auto rounded-lg shadow-md object-cover" />
                                 ) : (
-                                    <div className="w-24 h-24 mx-auto flex items-center justify-center rounded-full bg-gray-700 border-2" style={{ borderColor: eventTextColor }}>
-                                        <ProfileIcon color={eventTextColor} size="24" />
+                                    <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto flex items-center justify-center rounded-full bg-gray-700 border-2" style={{ borderColor: eventTextColor }}>
+                                        <ProfileIcon color={eventTextColor} size="20" />
                                     </div>
                                 )}
                             </div>
                         </div>
                         <button
-                            type="submit"
-                            className="w-full text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ backgroundColor: buttonBgColor, color: eventTextColor, '--tw-ring-color': buttonRingColor }} // Cores dinâmicas para o botão
-                            disabled={loading || !latestEvent}
-                        >
-                            {loading ? 'Cadastrando...' : 'Gerar Minha Credencial'}
-                        </button>
+                                type="submit"
+                                className="w-full text-white font-bold py-1.5 sm:py-3 px-3 sm:px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-base"
+                                style={{ backgroundColor: buttonBgColor, color: eventTextColor, '--tw-ring-color': buttonRingColor }} // Cores dinâmicas para o botão
+                                disabled={loading || !latestEvent}
+                            >
+                                {loading ? 'Cadastrando...' : 'Gerar Minha Credencial'}
+                            </button>
                         {!latestEvent && !loading && (
                             <p className="text-center text-yellow-400 text-sm mt-4">
                                 Aguardando a disponibilidade de um evento para vincular a credencial.
@@ -356,16 +376,17 @@ const App = () => {
                         )}
                     </form>
                 ) : (
-                    <div className="flex flex-col items-center space-y-6">
-                        <h2 className="text-3xl font-bold text-center" style={{ color: "#eceff1" }}>Sua Credencial</h2>
+                    <div className="flex flex-col items-center space-y-4 sm:space-y-6">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-center" style={{ color: "#eceff1" }}>Sua Credencial</h2>
                         <div
                             ref={credentialRef}
-                            className="border-4 rounded-2xl p-8 shadow-xl w-full max-w-sm text-center transform rotate-y-3 perspective-1000"
+                            className="border-3 sm:border-4 rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl w-full max-w-xs sm:max-w-sm text-center transform hover:scale-105 transition-all duration-500 rotate-y-3 perspective-1000 relative overflow-hidden"
                             style={{
                                 transformStyle: 'preserve-3d',
                                 backgroundColor: eventBgColor, // Usa a cor de fundo do evento
                                 color: eventTextColor, // Usa a cor do texto do evento
-                                borderColor: eventTextColor // Borda da credencial com a cor do texto do evento
+                                borderColor: eventTextColor, // Borda da credencial com a cor do texto do evento
+                                boxShadow: `0 10px 25px -5px ${adjustColor(eventBgColor, -30)}, 0 8px 10px -6px ${adjustColor(eventBgColor, -50)}`
                             }}
                         >
                             <div className="relative z-10">
@@ -374,82 +395,123 @@ const App = () => {
                                     <img
                                         src={profilePictureBase64}
                                         alt="Foto de Perfil"
-                                        className="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-2"
+                                        className="w-16 h-16 sm:w-24 sm:h-24 rounded-full mx-auto mb-2 sm:mb-4 object-cover border-2 shadow-lg transform transition-all duration-300 hover:scale-110"
                                         style={{ borderColor: eventTextColor }}
                                     />
                                 ) : (
-                                    <div className="w-24 h-24 mx-auto flex items-center justify-center rounded-full bg-gray-700 border-2" style={{ borderColor: eventTextColor }}>
-                                        <ProfileIcon color={eventTextColor} size="24" />
+                                    <div className="w-16 h-16 sm:w-24 sm:h-24 mx-auto flex items-center justify-center rounded-full bg-gray-700 border-2 shadow-lg transform transition-all duration-300 hover:scale-110" style={{ borderColor: eventTextColor }}>
+                                        <ProfileIcon color={eventTextColor} size="20" />
                                     </div>
                                 )}
-                                <p className="text-lg mb-2">Participante:</p>
-                                <p className="text-4xl font-extrabold mb-4 uppercase">{participant.nome}</p>
-                                <p className="text-xl mb-2">{participant.email}</p>
+                                <p className="text-base sm:text-lg mb-1 sm:mb-2">Participante:</p>
+                                <p className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-2 sm:mb-4 uppercase tracking-wide">{participant.nome}</p>
+                                {/* Email removido para melhorar a privacidade quando compartilhada nas redes sociais */}
                                 {participant.empresa && ( // Exibe a empresa se estiver disponível
-                                    <p className="text-lg mb-2 font-semibold">{participant.empresa}</p>
+                                    <div className="flex items-center justify-center mb-1 sm:mb-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                        </svg>
+                                        <p className="text-base sm:text-lg font-semibold">{participant.empresa}</p>
+                                    </div>
                                 )}
 
                                 {/* Contagem de participações com ícones de estrela */}
                                 {participant.eventos_participados && participant.eventos_participados.length > 0 && (
-                                    <div className="flex items-center justify-center flex-wrap gap-1 mt-4 mb-6">
-                                        <p className="text-md font-semibold mr-2">Participações:</p>
-                                        {Array(participant.eventos_participados.length).fill(0).map((_, i) => (
-                                            <StarIcon key={i} color={eventTextColor} />
-                                        ))}
+                                    <div className="mt-3 sm:mt-4 mb-4 sm:mb-6">
+                                        <p className="text-sm sm:text-md font-semibold mb-2">Participações:</p>
+                                        <div className="flex items-center justify-center flex-wrap gap-1">
+                                            {Array(participant.eventos_participados.length).fill(0).map((_, i) => (
+                                                <div key={i} className="transform transition-all duration-300 hover:scale-125 hover:rotate-12">
+                                                    <StarIcon key={i} color={eventTextColor} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs sm:text-sm mt-2 font-medium">{participant.eventos_participados.length} {participant.eventos_participados.length === 1 ? 'evento' : 'eventos'} participados</p>
                                     </div>
                                 )}
                                 {participant.eventos_participados && participant.eventos_participados.length === 0 && (
-                                    <p className="text-sm text-gray-400 mt-4 mb-6">Primeira participação!</p>
+                                    <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3 mt-3 sm:mt-4 mb-4 sm:mb-6 transform transition-all duration-300 hover:scale-105">
+                                        <p className="text-xs sm:text-sm font-medium">🎉 Primeira participação! 🎉</p>
+                                    </div>
                                 )}
 
 
                                 {latestEvent && (
-                                    <div className="bg-white bg-opacity-20 rounded-lg p-4 mb-6 shadow-inner"
+                                    <div className="bg-white bg-opacity-20 rounded-lg p-4 mb-6 shadow-inner transform transition-all duration-500 hover:bg-opacity-30 hover:shadow-lg"
                                          style={{ color: eventTextColor }}> {/* Mantém a cor do texto para o bloco do evento */}
-                                        <p className="text-md">Evento:</p>
-                                        <p className="text-2xl font-bold">{latestEvent.nome}</p>
-                                        <p className="text-sm">{new Date(latestEvent.data).toLocaleDateString('pt-BR', {
-                                            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                        })}</p>
+                                        <div className="flex items-center justify-center mb-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <p className="text-md font-medium">Evento:</p>
+                                        </div>
+                                        <p className="text-2xl font-bold tracking-wide">{latestEvent.nome}</p>
+                                        <div className="flex items-center justify-center mt-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <p className="text-sm">{new Date(latestEvent.data).toLocaleDateString('pt-BR', {
+                                                year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                            })}</p>
+                                        </div>
                                     </div>
                                 )}
                                 {/* Logo da Golang Sampa - movido para o final do conteúdo da credencial */}
-                                <img
-                                    src={golangLogoUrl}
-                                    alt="Logo Golang Sampa"
-                                    className="w-24 h-auto mx-auto mt-6" // Adicionado margem superior para espaçamento
-                                    onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/96x96/FFFFFF/000000?text=Logo"; }} // Fallback
-                                />
+                                <div className="mt-4 sm:mt-6 relative">
+                                    <div className="absolute inset-0 bg-white bg-opacity-10 rounded-full filter blur-md transform scale-110"></div>
+                                    <img
+                                        src={golangLogoUrl}
+                                        alt="Logo Golang Sampa"
+                                        className="w-16 sm:w-20 md:w-24 h-auto mx-auto relative z-10 transform transition-all duration-500 hover:scale-110 hover:rotate-12" 
+                                        onError={(e) => { e.target.onerror = null; e.target.src = "https://placehold.co/96x96/FFFFFF/000000?text=Logo"; }} // Fallback
+                                    />
+                                </div>
                             </div>
-                            {/* Fundo sutil da credencial, um pouco mais escuro que a cor de fundo do evento */}
+                            {/* Fundo sutil da credencial com padrão geométrico */}
                             <div
-                                className="absolute inset-0 opacity-70 rounded-2xl transform translateZ(-1px)"
+                                className="absolute inset-0 opacity-70 rounded-2xl transform translateZ(-1px) overflow-hidden"
                                 style={{ backgroundColor: adjustColor(eventBgColor, -15) }}
-                            ></div>
+                            >
+                                {/* Padrão geométrico decorativo */}
+                                <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white opacity-10 transform translate-x-20 -translate-y-20"></div>
+                                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white opacity-10 transform -translate-x-16 translate-y-16"></div>
+                                <div className="absolute top-1/2 left-1/2 w-24 h-24 rounded-full bg-white opacity-5 transform -translate-x-1/2 -translate-y-1/2"></div>
+                                {/* Linhas decorativas */}
+                                <div className="absolute bottom-10 left-0 right-0 h-px bg-white opacity-20"></div>
+                                <div className="absolute top-10 left-0 right-0 h-px bg-white opacity-20"></div>
+                            </div>
                         </div>
-
-                        <button
-                            onClick={downloadCredential}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ backgroundColor: buttonBgColor, color: eventTextColor, '--tw-ring-color': buttonRingColor }} // Cores dinâmicas para o botão
-                            disabled={loading}
-                        >
-                            {loading ? 'Baixando...' : 'Baixar Credencial em PDF'}
-                        </button>
-                        <button
-                            onClick={() => {
-                                setParticipant(null);
-                                setNome('');
-                                setEmail('');
-                                setEmpresa(''); // Limpa o campo empresa
-                                setProfilePictureBase64(''); // Limpa a foto de perfil também
-                                setSuccessMessage('');
-                            }}
-                            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800"
-                            style={{ backgroundColor: adjustColor(eventBgColor, -10), color: eventTextColor, '--tw-ring-color': buttonRingColor }} // Cores dinâmicas para o botão
-                        >
-                            Cadastrar Nova Credencial
-                        </button>
+i
+                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4 sm:mt-6">
+                            <button
+                                onClick={shareCredential}
+                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 hover:rotate-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center"
+                                style={{ backgroundColor: buttonBgColor, color: eventTextColor, '--tw-ring-color': buttonRingColor }} // Cores dinâmicas para o botão
+                                disabled={loading}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                                {loading ? 'Compartilhando...' : 'Compartilhar nas Redes Sociais'}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setParticipant(null);
+                                    setNome('');
+                                    setEmail('');
+                                    setEmpresa(''); // Limpa o campo empresa
+                                    setProfilePictureBase64(''); // Limpa a foto de perfil também
+                                    setSuccessMessage('');
+                                }}
+                                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 sm:py-3 px-4 sm:px-6 rounded-lg shadow-lg transform transition-all duration-300 hover:scale-105 hover:rotate-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 text-sm sm:text-base flex items-center justify-center"
+                                style={{ backgroundColor: adjustColor(eventBgColor, -10), color: eventTextColor, '--tw-ring-color': buttonRingColor }} // Cores dinâmicas para o botão
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Cadastrar Nova Credencial
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
